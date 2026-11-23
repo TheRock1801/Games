@@ -139,10 +139,15 @@ export class TitleScene implements Scene {
     // Calculate edges from measured text so it stays aligned across fonts and phone sizes.
     const word = 'RUGBY', font = 65, width = g.tw(word, font, { display: true });
     const left = Math.max(12, W / 2 - width / 2), right = Math.min(W - 12, W / 2 + width / 2);
-    g.label('tiny', left, 5, 13, '#FFFFFF', { bold: true });
     for (const dx of [-1.1, 0, 1.1]) g.label(word, W / 2 + dx + 2, 16, font, C.dark, { align: 1, display: true });
     for (const dx of [-1.1, 0, 1.1]) g.label(word, W / 2 + dx, 14, font, C.gold, { align: 1, display: true });
-    g.label('simulator', right, 72, 12, '#FFFFFF', { align: 2, bold: true });
+    // Both small words overlap the RUGBY silhouette: tiny begins just before the R;
+    // simulator shares RUGBY's lower edge instead of floating beneath it.
+    g.label('tiny', Math.max(3, left - 9), 6, 13, '#FFFFFF', { bold: true });
+    const small = 'simulator', smallSize = 12, smallY = 14 + font - smallSize + 1;
+    const smLeft = right - g.tw(small, smallSize, { bold: true }) - 3;
+    g.rect(smLeft - 3, smallY - 1, right - smLeft + 5, smallSize + 2, C.dark, 0.87);
+    g.label(small, right + 1, smallY, smallSize, '#FFFFFF', { align: 2, bold: true });
     if (this.count) {
       if (button(game, g, W / 2 - 138, 136, 134, 30, 'CONTINUE CAREER', { primary: true, size: 11 })) { game.go(new CareersScene(game)); return; }
       if (button(game, g, W / 2 + 4, 136, 134, 30, 'NEW CAREER', { size: 11 })) { game.go(this.count >= MAX_CAREERS ? new CareersScene(game, true) : new CompetitionScene(game)); return; }
