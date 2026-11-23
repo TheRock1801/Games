@@ -138,6 +138,16 @@ export function drawMatchBall(g: Gfx, x: number, y: number, k = 1) {
   g.rect(x + 2 * k, y, k, 3 * k, C.red);
 }
 
+// Exaggerated height in the overhead match camera: a high bomb looks several times larger.
+// The shadow remains at the ball's projected position, so a conversion stays aligned with the posts.
+export function airborneBallScale(z: number): number { return 1 + Math.min(2.65, Math.max(0, z) * 0.2); }
+export function drawAirborneBall(g: Gfx, x: number, y: number, z: number, k = 1) {
+  const q = k * airborneBallScale(z), shadow = k * (6 + Math.min(11, Math.max(0, z) * 0.9));
+  g.rect(x - shadow / 2, y + 1, shadow, Math.max(2, k * 2), '#000', 0.28);
+  if (z > 2.5) g.frame(x - shadow / 2 - 2, y - 2, shadow + 4, 6, '#000');
+  drawMatchBall(g, x, y - 5 * k, q);
+}
+
 // Small ball for menus and the place-kick screen.
 export function drawBall(g: Gfx, x: number, y: number) { drawMatchBall(g, x + 1, y + 1); }
 
