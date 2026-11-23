@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>TRS developer portal</title>
+<style>
+@font-face{font-family:TTDisplay;src:url(./fonts/display.woff2) format("woff2")}
+@font-face{font-family:TTSans;font-weight:600;src:url(./fonts/sans-600.woff2) format("woff2")}
+@font-face{font-family:TTSans;font-weight:700;src:url(./fonts/sans-700.woff2) format("woff2")}
+:root{--forest:#183B35;--deep:#0F2823;--card:#21504A;--card2:#2C645C;--cream:#F4F0E6;--dim:#A9BDB0;--ochre:#E8B65C;--coral:#D47B59;--green:#43865B;--slate:#506E82}
+*{box-sizing:border-box}
+html{background:var(--forest);color:var(--cream);font:600 16px/1.5 TTSans,system-ui,sans-serif}
+body{margin:0}
+header{background:var(--deep);border-bottom:3px solid var(--ochre);padding:18px 32px;display:flex;align-items:baseline;gap:20px;flex-wrap:wrap}
+h1{font:400 30px/1 TTDisplay,Georgia,serif;color:var(--ochre);margin:0}
+header p{margin:0;color:var(--dim);font-size:14px}
+main{display:grid;grid-template-columns:minmax(380px,1fr) minmax(480px,1.25fr);gap:28px;padding:28px 32px 80px;max-width:1700px;margin:0 auto;align-items:start}
+@media(max-width:1100px){main{grid-template-columns:1fr}.stage{position:static!important}}
+h2{font:400 22px/1.2 TTDisplay,Georgia,serif;color:var(--cream);margin:0 0 4px}
+h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:26px 0 10px}
+.lead{color:var(--dim);font-size:14px;margin:0 0 14px;max-width:60ch}
+.card{background:var(--card);border-radius:10px;padding:16px 18px;margin-bottom:10px}
+.dial{display:grid;grid-template-columns:1fr 92px;gap:6px 14px;align-items:center}
+.dial label{font-weight:700}
+.dial .help{grid-column:1/-1;color:var(--dim);font-size:13.5px;margin:-2px 0 4px}
+.dial input[type=range]{grid-column:1;width:100%;accent-color:var(--ochre);height:28px}
+.dial input[type=number]{width:100%;background:var(--deep);color:var(--cream);border:1px solid var(--card2);border-radius:6px;padding:7px 8px;font:inherit;text-align:right}
+.dial .unit{color:var(--dim);font-size:12px;text-align:right}
+.dial.changed label::after{content:" changed";color:var(--ochre);font-size:12px;font-weight:600}
+button{font:700 15px TTSans,system-ui,sans-serif;border:0;border-radius:8px;padding:11px 16px;background:var(--card2);color:var(--cream);cursor:pointer}
+button:hover{filter:brightness(1.12)}
+button.primary{background:var(--ochre);color:var(--deep)}
+button.warn{background:transparent;border:1px solid var(--coral);color:var(--coral)}
+button.on{outline:2px solid var(--ochre)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.bar{position:sticky;top:0;z-index:5;background:var(--forest);padding:12px 0;margin-bottom:6px;border-bottom:1px solid var(--card2)}
+.stage{position:sticky;top:16px}
+iframe{width:100%;aspect-ratio:19.5/9;border:0;border-radius:12px;background:#000;display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.scen{text-align:left;padding:12px 14px;background:var(--card)}
+.scen small{display:block;color:var(--dim);font-weight:600;font-size:12.5px;line-height:1.35;margin-top:3px}
+#status{color:var(--dim);font-size:14px;min-height:1.5em}
+#status.good{color:var(--ochre)}
+#status.bad{color:var(--coral)}
+ul.hist{list-style:none;padding:0;margin:0}
+ul.hist li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--card2);font-size:14px}
+ul.hist button{padding:6px 12px;font-size:13px}
+select{background:var(--deep);color:var(--cream);border:1px solid var(--card2);border-radius:6px;padding:9px;font:inherit}
+code{background:var(--deep);padding:1px 6px;border-radius:4px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>TRS developer portal</h1>
+  <p>Private. This page only exists while the dev server is running and is not part of the game players get.</p>
+</header>
+<main>
+  <section id="tuning"></section>
+  <section class="stage" id="stage"></section>
+</main>
+<script type="module" src="/src/dev/portal.ts"></script>
+</body>
+</html>
