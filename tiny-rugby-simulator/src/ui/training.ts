@@ -42,6 +42,7 @@ export class TrainingScene implements Scene {
   private ox = SX0;                  // where the ball starts, along the field
   private names: { name: string; pos: string; id: number; skin: number }[] = [];
   private tap0: { x: number; y: number } | null = null; // a finger down on a man mid-play: a tap chooses him, a pull draws his new run
+  private blankTap: { id: number; x: number; y: number } | null = null;
   private turning: { t: number; to: number; x: number; y: number } | null = null; // the change of direction being pulled out
   // A real scrum in the middle of the field, or a real lineout on the top touchline: forwards and all.
   private cfg() { return this.def ? { x: SX0, y: MID, kind: 'scrum' as const } : this.lineout ? { x: SX0, y: 0, kind: 'lineout' as const, set: true, edge: 0 } : { x: SX0, y: MID, kind: 'scrum' as const, set: true }; }
@@ -76,7 +77,7 @@ export class TrainingScene implements Scene {
   }
 
   private pick(slot: number) {
-    this.slot = slot; this.sel = -1; this.drag = null; this.mode = '';
+    this.slot = slot; this.sel = -1; this.drag = null; this.blankTap = null; this.mode = '';
     this.f = this.own[slot] ? copyPlay(this.own[slot]!) : this.fresh(`Play ${slot + 1}`);
     // a play drawn before set plays were for the backs alone has too many marks: it starts again from the standard shape
     if (!this.def && this.f.spots.length !== this.need) this.f = this.fresh(this.f.name, this.f.from);
@@ -153,7 +154,7 @@ export class TrainingScene implements Scene {
     if (this.locked) return;
     const board: Rect = [BX, BY, BW, BH];
     // the time slider
-    if (e.t === 'down' && inRect(e, SLIDER)) { this.scrub = e.id; this.drag = null; this.setTime(e); return; }
+    if (e.t === 'down' && inRect(e, SLIDER)) { this.scrub = e.id; this.drag = null; this.blankTap = null; this.setTime(e); return; }
     if (e.id === this.scrub) { this.setTime(e); if (e.t === 'up') this.scrub = -1; return; }
     if (e.t === 'down') {
       if (!inRect(e, board)) return;
@@ -170,14 +171,32 @@ export class TrainingScene implements Scene {
         if (this.mode === 'pass') { if (h >= 0) { this.addPass(h); this.mode = ''; } return; }
         // with a man chosen, a touch on open field is where he runs to from this moment on
         // and it is drawn the way a run is: pull the arrow out to where he should go
-        if (h === -1 && this.sel >= 0) { this.drag = { id: e.id, kind: 'route', moved: true }; this.startTurn(e); return; }
+        if (h === -1) { this.blankTap = { id: e.id, x: e.x, y: e.y }; return; }
         // a finger on a man chooses him, and pulling away from him draws his new run from this moment
         this.sel = h;
         if (h !== -1) { this.tap0 = { x: e.x, y: e.y }; this.drag = { id: e.id, kind: 'route', moved: false }; }
         return;
       }
       if (h !== -1) { this.sel = h; this.drag = { id: e.id, kind: 'move', moved: false }; }
-      else if (this.sel >= 0 && this.sel < OFF_MARK && !this.def) { this.drag = { id: e.id, kind: 'route', moved: true }; this.route(e); }
+      else if (this.sel !== -1) this.blankTap = { id: e.id, x: e.x, y: e.y };
+      return;
+    }
+    if (this.blankTap?.id === e.id) {
+      const b = this.blankTap;
+      if (Math.hypot(e.x - b.x, e.y - b.y) <= 6) {
+        if (e.t === 'up') { this.sel = -1; this.blankTap = null; this.drag = null; }
+        return;
+      }
+      this.blankTap = null;
+      if (this.sel < 0) return;
+      this.drag = { id: e.id, kind: 'route', moved: true };
+      if (this.at > 0) this.startTurn(e);
+      else if (!this.def && this.sel < OFF_MARK) this.route(e);
+      if (e.t === 'up') {
+        if (this.turning) { this.turning = null; this.keep(); }
+        else if (this.at === 0) this.keep();
+        this.drag = null;
+      }
       return;
     }
     const d = this.drag;
