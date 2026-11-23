@@ -23,10 +23,24 @@ This is an edited copy of the user's TRY TIME project. The original ZIP was not 
 ## Still to do
 
 - A full live, playable defensive phase after opposition turnovers. The engine currently uses a text-based opposition simulator in parts of match flow; this deserves dedicated implementation and tests.
-- Full perspective/visual redesign of goalposts so the on-screen posts and scoring feel unmistakably aligned. Scoring precision was improved, but this still needs actual mobile visual QA.
+- Visually verify the newly overhead goalposts on an actual phone during conversions, alongside scoring accuracy.
 - Manual gameplay tuning of speed, scoring, tackling and set-play balance after the new ratings model.
 - Ensure all official team and competition names are appropriately licensed or replaced before a commercial release.
 
 ## GitHub
 
-The ZIP is ready for source control. Upload only to a personally controlled account. Ignore `node_modules`, `dist`, `.env`, secrets and local `.git` artifacts. The repository `TheRock1801/Games` was accessible for reading, but the connected GitHub identity at review time was `HarrowsMarketing`, with **no permission to push**. Connect `TheRock1801` before publishing to that repository. Do not commit to a Harrows repository.
+The reviewed source is stored in the user's personal repository `TheRock1801/Games`. Do not commit to any Harrows repository. Ignore `node_modules`, `dist`, `.env`, secrets and local `.git` artifacts.
+
+## Mobile playtest update, 24 November 2026
+
+- Moved **tiny** tighter to the left edge of RUGBY and overlapped **simulator** with the bottom of the wordmark.
+- Made **conversion goalposts genuinely top-down**: two aligned overhead post pads and one overhead crossbar, precisely at the world coordinates used to score kicks.
+- Kicks now swell to up to **3.65 times** their ground-level ball size at maximum height, with their shadow kept on the projected flight line. This applies to open-play kicks, penalties for touch and conversions.
+- Removed persistent text from live match play. Controls appear in the **first career match only**, not after prior career results or in training drills. Simplified the opponent-possession sequence into an animated field marker.
+- Training Ground: tap empty grass to deselect a player; drag it to create a run.
+- Defensive AI now prioritises running for kicked balls over holding its normal line, including when a defender starts behind the landing spot.
+- Kicks aimed into touch visually travel **2.4 m past** the sideline before the game awards touch. Official touch/lineout outcomes still use the actual crossing.
+- Increased on-field visibility of featured players via animated gold marking.
+- Added regression tests in `tests/ux.test.ts`; locally ran eight standalone Node runtime smoke checks and a source-level TypeScript check.
+
+**Validation limit:** The full npm install and Vitest suite could not run inside this restricted execution environment. On Windows, run `npm ci`, `npm test`, and `npm run build` before wider sharing. Phone touch and conversion visuals still deserve manual QA.
