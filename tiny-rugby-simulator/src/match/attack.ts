@@ -41,6 +41,20 @@ export interface StartCfg { x: number; y: number; kind: 'ruck' | 'open' | 'scrum
 // Where the three lineout jumpers stand, in metres in from touch: front, middle and back.
 export const LO_SPOTS = [6, 10, 14];
 
+// A kick leaving the pitch must visibly cross the paint before the referee calls touch.
+// The match outcome is still calculated at the exact touchline intersection.
+export function visibleTouchExit(from: { x: number; y: number }, to: { x: number; y: number }) {
+  if (to.y >= 0 && to.y <= FW) return { x: to.x, y: to.y, cut: 1 };
+  const edge = to.y < 0 ? 0 : FW, overshoot = 2.4;
+  const fraction = clamp((edge - from.y) / (to.y - from.y), 0, 1);
+  const cut = clamp(fraction + overshoot / Math.max(1, Math.abs(to.y - from.y)), 0.05, 1);
+  return {
+    x: from.x + (to.x - from.x) * cut,
+    y: edge + (to.y < 0 ? -overshoot : overshoot),
+    cut,
+  };
+}
+
 // kk: the sort of kick. low skids through, high hangs, long goes for territory, box is the halfback's.
 export type KickKind = 'low' | 'high' | 'long' | 'box' | 'drive';
 export interface Aim { kind: 'pass' | 'kick'; x: number; y: number; dist: number; drop: boolean; chip: boolean; box: boolean; arc: number; kk: KickKind }
@@ -700,10 +714,9 @@ export class AttackPlay {
     // the defence has to see it, turn and get going; nobody starts at full pace
     for (const d of this.def) { d.react = (d.sweeper ? this.rng.range(0.3, 0.6) : this.rng.range(0.5, 0.9)) + 0.25 * this.ease; d.v = 0; }
     this.kickEnd = this.resolveKick(c, L);
-    // A kick that is going out on the full is still in the air when it crosses the line: it flies the
-    // first part (cut) of its whole arc, so nobody standing on the touchline plucks it off the grass.
-    let tx = L.x, ty = L.y, cut = 1;
-    if (L.y < 0 || L.y > FW) { const t = ((L.y < 0 ? 0 : FW) - c.y) / (L.y - c.y); tx = c.x + (L.x - c.x) * t; ty = L.y < 0 ? 0 : FW; cut = clamp(t, 0.05, 1); }
+    // Follow the ball beyond touch by a visible 2.4m; referee decisions still use
+    // the exact line crossing in resolveKick rather than this purely visual endpoint.
+    const { x: tx, y: ty, cut } = visibleTouchExit(c, L);
     Object.assign(this.ball, {
       mode: 'kick', fx: c.x, fy: c.y, tx: Math.min(tx, FL + IG), ty, t: 0, target: -1, dist,
       dur: (kd.hang + dist * kd.per) * Math.sqrt(T.kickHeight) * cut, high: kd.arc * T.kickHeight, cut,
@@ -1082,7 +1095,7 @@ export class AttackPlay {
     if (kicking) {
       // the best-placed man is the catcher, and he stays the catcher unless somebody is clearly nearer
       let best = -1, bq = 1e9;
-      this.def.forEach((d, i) => { if (!this.up(d) || !(d.sweeper || kickers.has(i))) return; const q = Math.hypot(d.x - tgt.x, d.y - tgt.y) / Math.max(2, this.dspd(d)); if (q < bq) { bq = q; best = i; } });
+      this.def.forEach((d, i) => { if (!this.up(d) || d.off || d.st === 'dive') return; const q = Math.hypot(d.x - tgt.x, d.y - tgt.y) / Math.max(2, this.dspd(d)); if (q < bq) { bq = q; best = i; } });
       const cur = this.def[this.catcher];
       if (!(cur && this.up(cur) && Math.hypot(cur.x - tgt.x, cur.y - tgt.y) / Math.max(2, this.dspd(cur)) < bq + 0.4)) this.catcher = best;
     } else this.catcher = -1;
@@ -1136,6 +1149,18 @@ export class AttackPlay {
         continue;
       }
       let tx: number, ty: number, sp = top;
+      if (kicking) {
+        // Kick chasing takes priority over the normal defensive line. Defenders who
+        // start on the wrong side of a landing point must turn and collect it.
+        if (d.react > 0) { d.react = Math.max(0, d.react - dt); continue; }
+        d.st = 'press';
+        d.v = Math.min(top, d.v + this.acc(d) * dt);
+        const goes = d.sweeper || kickers.has(i);
+        if (i === this.catcher || (goes && b.mode === 'loose')) this.moveTo(d, tgt.x, tgt.y, d.v, dt);
+        else if (goes) this.moveTo(d, tgt.x + 3.5, clamp(tgt.y + (d.y >= tgt.y ? 4.5 : -4.5), 1, FW - 1), d.v, dt);
+        else this.moveTo(d, tgt.x + 4, clamp(d.y, 1, FW - 1), d.v, dt);
+        continue;
+      }
       if (d.x < tgt.x - 0.6) {
         // Beaten. The two nearest chase the runner, at their own pace, to where he is going. The others do
         // not all follow him: each gets back goal-side of the man he was marking, so the far side of the
@@ -1155,17 +1180,6 @@ export class AttackPlay {
       } else if (d.sweeper && !kicking) {
         if (broken || through || dist < 4.5) { d.st = 'press'; const look = clamp(dist / 9, 0.15, 0.6); tx = tgt.x + this.vx * look * 0.5; ty = tgt.y + (hold ? this.vy * look : 0); sp = top; }
         else { d.st = 'line'; tx = Math.min(d.x, Math.max(tgt.x + 18, d.x - top * dt)); ty = tgt.y * 0.75 + 5; sp = top * 0.7; }
-      } else if (b.mode === 'kick' || b.mode === 'bounce' || (b.mode === 'loose' && this.kicked)) {
-        // A kick over the top. He needs a moment to turn, then gets going at his own acceleration.
-        // The sweeper and the two nearest go for the ball; the rest drop back behind it.
-        if (d.react > 0) { d.react -= dt; continue; }
-        d.st = 'press';
-        d.v = Math.min(top, d.v + this.acc(d) * dt);
-        const goes = d.sweeper || kickers.has(i);
-        if (i === this.catcher || (goes && b.mode === 'loose')) this.moveTo(d, tgt.x, tgt.y, d.v, dt);
-        else if (goes) this.moveTo(d, tgt.x + 3.5, clamp(tgt.y + (d.y >= tgt.y ? 4.5 : -4.5), 1, FW - 1), d.v, dt); // in support, not under it
-        else this.moveTo(d, Math.max(d.x, tgt.x - 4), d.y, d.v, dt);
-        continue;
       } else if (pressers.has(i) || dist < 2.2) {
         d.st = 'press'; tx = tgt.x + (hold ? this.vx * 0.12 : 0); ty = tgt.y + (hold ? this.vy * 0.2 : 0); sp = top * 0.9;
       } else {
