@@ -8,13 +8,13 @@ import { AttackPlay, FL, FW, IG, MID, POST, type Aim } from '../match/attack';
 import { LO_FLY, LO_NAMES, LO_OVER, LO_TAP, LO_ZONES, Match, RUCK_INTRO, type Side } from '../match/match';
 import { where } from '../match/oppsim';
 import type { MatchResult } from '../career/types';
-import { C, PITCH, button, colourDist, drawBall, drawMatchBall, drawPlayer, inRect, tc, type Rect, type SpritePose } from './ui';
+import { C, PITCH, button, colourDist, drawAirborneBall, drawBall, drawMatchBall, drawPlayer, inRect, tc, type Rect, type SpritePose } from './ui';
 
 // The pitch is far bigger than the screen: the camera follows the ball along it and across it.
 // Pixels per metre along the pitch come from the tuning config; across it is a little tighter.
 const TOP = 14;
 const VIEW_H = H - TOP;
-const ZP = 4;              // pixels a ball rises per metre of height
+const ZP = 4;              // height of kick-aim dots, in logical pixels per metre
 const AIM_MIN = 8;         // pixels the passing thumb must pull back before an aim line appears
 const AIM_MAX = 62;        // pull-back, in pixels, that gives the longest pass or kick
 const SWIPE = 7;           // pixels the running thumb must travel before it counts as a movement
@@ -49,6 +49,7 @@ export class MatchScene implements Scene {
   private bookOpen = false;
   private allPlays: Formation[] = [];
   private idle = 0;
+  private showTutorial: boolean;
 
   constructor(private game: Game, us: Side, them: Side, knockout: boolean, seed: number, private onDone: (r: MatchResult) => void, private sandbox?: Sandbox) {
     // Swap the away kit if the two jerseys are too alike.
@@ -59,6 +60,13 @@ export class MatchScene implements Scene {
       if (alt && colourDist(alt, us.c1) > colourDist(them.c1, us.c1)) this.them = { ...them, c1: alt, c2: them.c1 };
     }
     this.m = new Match(us, this.them, new Rng(seed), knockout);
+    // Only the first career match teaches controls. Persist once the match is opened;
+    // repeated seasons, training drills and returning users receive a clean pitch.
+    const key = 'trs.match.tutorial.seen.v1';
+    const career = game.career;
+    const playedBefore = !!career && (career.record.w + career.record.d + career.record.l > 0 || (career.history?.length ?? 0) > 0);
+    this.showTutorial = !sandbox && !playedBefore && game.store.get(key) !== '1';
+    if (this.showTutorial) game.store.set(key, '1');
     this.allPlays = bookOf(game); this.book = this.allPlays;
     if (sandbox) this.restart();
   }
@@ -266,8 +274,7 @@ export class MatchScene implements Scene {
     drawPlayer(g, fx - 4 * sc, fy, m.us, 1, k.phase === 'aim' ? 'stand' : 'pass', 0, 1, sc);
     if (k.phase !== 'aim') {
       const p = m.longBall(k), bx = this.X(p.x), by = this.Y(p.y);
-      g.rect(bx - 3 * sc, by, 6 * sc, 2, '#000', 0.3);
-      drawMatchBall(g, bx, by - 5 * sc - Math.round(p.z * ZP), sc);
+      drawAirborneBall(g, bx, by, p.z, sc);
       return;
     }
     drawMatchBall(g, fx + 4 * sc, fy - 1, sc);
@@ -526,24 +533,19 @@ export class MatchScene implements Scene {
   }
 
   private posts(g: Gfx, x: number) {
-    const k = this.k, px = this.X(x), far = this.Y(MID - POST), near = this.Y(MID + POST);
-    const tall = Math.round(34 * k), bar = Math.round(15 * k), white = '#FBF8EE', edge = '#1C2327', shade = '#C9C3B0';
-    // shadows on the grass, falling away to the right
-    for (const y of [far, near]) for (let i = 0; i < 10; i++) g.rect(px + 2 + i * 2, y - i, 3, 2, '#000', 0.16);
-    const upright = (y: number, w: number) => {
-      g.rect(px - 1, y - tall - 1, w + 2, tall + 2, edge);
-      g.rect(px, y - tall, w, tall, white); g.rect(px + w - 1, y - tall, 1, tall, shade);
-      // the pad round the base, in the home side's colour
-      g.rect(px - 2, y - 7 * k, w + 4, 7 * k + 1, edge); g.rect(px - 1, y - 7 * k + 1, w + 2, 7 * k - 1, x === 0 ? this.m.us.c1 : this.them.c1);
-    };
-    upright(far, 3);
-    // Both uprights have equal thickness and height for legibility in this simplified camera.
-    // the crossbar joins the two uprights at bar height
-    g.rect(px - 1, far - bar - 2, 5, near - far + 4, edge);
-    g.rect(px, far - bar - 1, 3, near - far + 2, white); g.rect(px + 2, far - bar - 1, 1, near - far + 2, shade);
-    upright(near, 3);
-    // a flag on top of each so the tops read against the grass
-    g.rect(px + 3, near - tall - 1, 4, 3, C.gold); g.rect(px + 2, far - tall - 1, 3, 2, C.gold);
+    // The camera is bird's-eye. Draw the two pad tops and the crossbar from above,
+    // at the exact (x, y) coordinates used by goal-kick scoring.
+    const px = this.X(x), far = this.Y(MID - POST), near = this.Y(MID + POST);
+    const white = '#FFFDF2', edge = '#1C2327', kit = x === 0 ? this.m.us.c1 : this.them.c1;
+    g.rect(px + 2, far + 2, 3, near - far + 3, '#000', 0.22); // soft pitch shadow
+    g.rect(px - 1, far, 3, near - far, edge);
+    g.rect(px, far + 1, 1.5, near - far - 2, white);
+    for (const y of [far, near]) {
+      g.rect(px - 5, y - 5, 11, 11, edge);
+      g.rect(px - 4, y - 4, 9, 9, kit);
+      g.rect(px - 2, y - 2, 5, 5, white);
+      g.rect(px - 1, y - 1, 3, 3, edge);
+    }
   }
 
   private drawPlay(g: Gfx, p: AttackPlay) {
@@ -588,7 +590,12 @@ export class MatchScene implements Scene {
         }
         // once he is down the ball is placed back on his own side, ready for the halfback
         if (tk && tk.who === i && tkK >= 0.7) drawMatchBall(g, px - 10 * k, py - 1, k);
-        if (a.star && pose !== 'lie') { const sx2 = px - 7 * k, sy2 = py - 17 * k; g.rect(sx2, sy2 + 1, 3, 1, C.gold); g.rect(sx2 + 1, sy2, 1, 3, C.gold); }
+        if (a.star && pose !== 'lie') {
+          const sx2 = px - 8 * k, sy2 = py - 21 * k, pulse = 0.75 + 0.25 * Math.sin(this.now * 4 + i);
+          g.rect(px - 6 * k, py + 4 * k, 12 * k, 1.5 * k, C.gold, pulse);
+          g.rect(sx2, sy2 + 2 * k, 7 * k, 1.5 * k, C.gold);
+          g.rect(sx2 + 3 * k, sy2, 1.5 * k, 6 * k, C.gold);
+        }
         if (has && st !== 'score') { const ay = py - 22 * k; g.rect(px - 2, ay, 5, 1, C.gold); g.rect(px - 1, ay + 1, 3, 1, C.gold); g.rect(px, ay + 2, 1, 1, C.gold); }
       } });
     });
@@ -625,14 +632,17 @@ export class MatchScene implements Scene {
         g.frame(lx - 7, ly - 4, 15, 9, C.ink); g.rect(lx - 2, ly - 1, 5, 3, C.gold, pulse);
       }
       const bx = this.X(b.x), by = this.Y(b.y), onGround = b.mode === 'loose';
-      g.rect(bx - 3 * k, by, 6 * k, 2, '#000', 0.3);
-      drawMatchBall(g, bx, by - (onGround ? 1 : 6 * k) - Math.round(b.z * ZP), k);
+      if (b.mode === 'kick' || b.mode === 'bounce') drawAirborneBall(g, bx, by, b.z, k);
+      else {
+        g.rect(bx - 3 * k, by, 6 * k, 2, '#000', 0.3);
+        drawMatchBall(g, bx, by - (onGround ? 1 : 6 * k) - Math.round(b.z * ZP), k);
+      }
     }
     const bt = this.touch('ball');
     if (this.m.mode === 'play' && bt && held && (st === 'ready' || st === 'live')) this.drawAim(g, p, bt);
     if (p.flashT > 0) g.label(tc(p.flash), this.X(b.x), this.Y(b.y) - 38 * k, 9, C.gold, { align: 1, bold: true });
-    if (st === 'live' && b.mode === 'kick' && b.fx > b.tx) g.label('Their kick-off: get under it', W / 2, TOP + 4, 8, C.ink, { align: 1, bold: true, a: 0.9 });
-    if (p.canDive() && st === 'live') g.label('Swipe forward to dive', this.X(c.x), this.Y(c.y) + 6, 7, C.ink, { align: 1, a: 0.9 });
+    if (this.showTutorial && st === 'live' && b.mode === 'kick' && b.fx > b.tx) g.label('Get under the kick', W / 2, TOP + 4, 8, C.ink, { align: 1, bold: true, a: 0.9 });
+    if (this.showTutorial && p.canDive() && st === 'live') g.label('Swipe forward to dive', this.X(c.x), this.Y(c.y) + 6, 7, C.ink, { align: 1, a: 0.9 });
   }
 
   // Players waiting at a breakdown stand still once they have got where they are going.
@@ -714,11 +724,11 @@ export class MatchScene implements Scene {
       g.frame(e.x - 5, e.y - 18 * k, 11, 7, col);
       g.label(a.dist > LO_OVER ? 'Over the top, to the backs: risky' : `${LO_NAMES[zone]}${risk >= 0.28 ? ': risky' : ''}`, W / 2, geo.into > 0 ? H - 31 : TOP + 22, 9, col, { align: 1, bold: true });
     }
-    // the hint sits at whichever edge the thrower is not standing on
-    const hy = geo.into > 0 ? H - 19 : TOP;
-    g.rect(this.left, hy, this.vw, 19, C.dark, 0.62);
-    g.label('Lineout: pull back to aim the throw, let go to throw', W / 2, hy + 2, 7, C.ink, { align: 1 });
-    g.label('Short to the front, long to the back. The marked jumper is the one they are covering', W / 2, hy + 10, 6.5, C.dim, { align: 1 });
+    if (this.showTutorial) {
+      const hy = geo.into > 0 ? H - 14 : TOP;
+      g.rect(this.left, hy, this.vw, 14, C.dark, 0.70);
+      g.label('Pull to aim the throw. Release to throw.', W / 2, hy + 3, 7, C.ink, { align: 1 });
+    }
   }
 
   private hud(g: Gfx) {
@@ -735,13 +745,13 @@ export class MatchScene implements Scene {
   // Nothing sits over the pitch in open play. Before the ball is played there is the set-play button,
   // and for the first few phases a reminder of what each thumb does.
   private drawControls(g: Gfx, p: AttackPlay) {
-    g.label(p.att[p.carrier].name, W / 2 - 36, 3.5, 7, C.gold, { align: 2 });
-    g.label(`Phase ${this.m.phase}`, W / 2 + 36, 3.5, 7, C.dim);
+    // Score and clock already live in the HUD. No permanent phase/name subtitles.
     if (p.state === 'maul') {
       const risk = p.maulRisk();
-      g.rect(this.left, H - 19, this.vw, 19, C.dark, 0.62);
-      g.label('Maul: the pack is driving. Touch to play the ball away', W / 2, H - 17, 7, C.ink, { align: 1 });
-      g.label(risk <= 0 ? 'Safe for now' : risk < 0.15 ? 'They are getting hold of it' : 'Use it or lose it!', W / 2, H - 9, 6.5, risk <= 0 ? C.dim : risk < 0.15 ? C.gold : C.red, { align: 1, bold: risk > 0 });
+      if (this.showTutorial) {
+        g.rect(this.left, H - 13, this.vw, 13, C.dark, 0.70);
+        g.label('MAUL: tap to move the ball away', W / 2, H - 11, 7, C.ink, { align: 1 });
+      } else if (risk > 0.15) g.label('USE IT', W / 2, H - 12, 9, C.red, { align: 1, bold: true });
       return;
     }
     if (p.koOnly && p.penKick) {
@@ -750,17 +760,19 @@ export class MatchScene implements Scene {
       this.drawWind(g, this.left + 6, TOP + 16);
       if (a) { const ex = this.X(a.x), ey = this.Y(a.y); g.frame(ex - 7, ey - 4, 15, 9, C.gold); g.frame(ex - 4, ey - 2, 9, 5, C.ink); }
       this.miniMap(g, c, a);
-      g.rect(this.left, H - 19, this.vw, 19, C.dark, 0.62);
-      g.label('Kick for touch: pull back to aim, let go to kick', W / 2, H - 17, 7, C.ink, { align: 1 });
-      g.label('It is live until it crosses a touchline. They can catch it; so can you', W / 2, H - 9, 6.5, C.dim, { align: 1 });
+      if (this.showTutorial) {
+        g.rect(this.left, H - 14, this.vw, 14, C.dark, 0.7);
+        g.label('Aim for touch: pull back, release to kick', W / 2, H - 12, 7, C.ink, { align: 1 });
+      }
       return;
     }
     if (p.koOnly) {
       const tx = this.X(60);
       for (let y = 0; y < FW * this.sy; y += 6) g.rect(tx, this.Y(0) + y, 1, 3, C.gold, 0.8);
-      g.rect(this.left, H - 19, this.vw, 19, C.dark, 0.62);
-      g.label('Kick-off: pull back to aim, let go to kick. It cannot be passed', W / 2, H - 17, 7, C.ink, { align: 1 });
-      g.label('It must reach the dashed ten-metre line. A short high one can be chased down', W / 2, H - 9, 6.5, C.dim, { align: 1 });
+      if (this.showTutorial) {
+        g.rect(this.left, H - 14, this.vw, 14, C.dark, 0.7);
+        g.label('Kick past the 10m line: pull back, release', W / 2, H - 12, 7, C.ink, { align: 1 });
+      }
       return;
     }
     if (p.state !== 'ready') return;
@@ -774,14 +786,13 @@ export class MatchScene implements Scene {
         g.label(`${i + 1}  ${f.name}`, s[0] + 6, s[1] + 3.5, 7.5, on ? C.dark : C.ink, { bold: true });
       });
     }
-    if (this.plays > 4 || this.bookOpen) return;
-    g.rect(this.left, H - 23, this.vw, 23, C.dark, 0.62);
-    g.rect(W / 2, H - 20, 1, 17, C.ink, 0.35);
-    g.label('Left thumb runs', W / 2 - 8, H - 21, 7.5, C.gold, { align: 2, bold: true });
-    g.label('Drag up or down to move. Flick to sidestep', W / 2 - 8, H - 11, 6.5, C.ink, { align: 2 });
-    g.label('Right thumb passes', W / 2 + 8, H - 21, 7.5, C.gold, { bold: true });
-    g.label('Pull back to aim, let go. Aim upfield to kick', W / 2 + 8, H - 11, 6.5, C.ink);
-    g.label(`${tc(where(p.startX))}, ${Math.max(0, Math.round(FL - p.startX))} m to go`, W / 2, TOP + 4, 7, C.ink, { align: 1, a: 0.9 });
+    if (!this.showTutorial || this.plays > 2 || this.bookOpen) return;
+    g.rect(this.left, H - 19, this.vw, 19, C.dark, 0.68);
+    g.rect(W / 2, H - 17, 1, 14, C.ink, 0.3);
+    g.label('LEFT: RUN', W / 2 - 7, H - 17, 7.5, C.gold, { align: 2, bold: true });
+    g.label('Drag / flick', W / 2 - 7, H - 8, 6.5, C.ink, { align: 2 });
+    g.label('RIGHT: PASS / KICK', W / 2 + 7, H - 17, 7.5, C.gold, { bold: true });
+    g.label('Pull / release', W / 2 + 7, H - 8, 6.5, C.ink);
   }
 
   // A small bar low on the screen, so the pitch and the players stay in view behind it.
@@ -789,7 +800,7 @@ export class MatchScene implements Scene {
     const t = this.m.timing!;
     const pw = 168, px = W / 2 - pw / 2, py = H - 31;
     g.card(px, py, pw, 28, C.dark, 0.74); g.rect(px + 1, py, pw - 2, 1, C.gold);
-    const note = t.done ? (t.result === 'perfect' ? 'Penalty won!' : t.result === 'good' ? 'Secured' : 'Lost it') : 'Contested ruck: tap to win the ball';
+    const note = t.done ? (t.result === 'perfect' ? 'PENALTY' : t.result === 'good' ? 'SECURED' : 'LOST') : this.showTutorial ? 'TAP TO CONTEST' : 'RUCK';
     g.label(note, W / 2, py + 3, 7.5, t.done ? (t.result === 'miss' ? C.red : C.gold) : C.ink, { align: 1, bold: true });
     const bx = px + 8, bw = pw - 16, by = py + 14;
     g.rect(bx, by, bw, 8, C.panel);
@@ -810,20 +821,17 @@ export class MatchScene implements Scene {
   }
 
   private drawSim(g: Gfx) {
-    const m = this.m, s = m.sim!;
-    g.card(30, 20, 260, 146, C.dark, 0.94); g.rect(31, 20, 258, 2, this.them.c1);
-    g.label(`${tc(this.them.name)} attack`, W / 2, 26, 12, C.gold, { align: 1, display: true });
-    const n = Math.min(s.lines.length, Math.floor(m.simT / 0.8) + 1);
-    const first = Math.max(0, n - 7);
-    for (let i = first; i < n; i++) {
-      const hot = /TRY|GOAL|3 POINTS|CONVERTED$/.test(s.lines[i]) && !/MISS/.test(s.lines[i]);
-      g.label(tc(s.lines[i]), 42, 46 + (i - first) * 12, 8, hot ? C.red : /YOUR|YOU /.test(s.lines[i]) ? C.gold : C.ink);
-    }
-    const bx = 60, bw = 200, by = 136;
-    g.rect(bx, by, bw, 6, PITCH.a); g.rect(bx, by, 1, 6, C.ink); g.rect(bx + bw - 1, by, 1, 6, C.ink); g.rect(bx + bw / 2, by, 1, 6, C.ink, 0.6);
-    g.rect(bx + (s.track[n - 1] / 100) * bw - 1, by - 2, 3, 10, C.gold);
-    g.label('Your line', bx, by + 8, 6.5, C.dim); g.label('Their line', bx + bw, by + 8, 6.5, C.dim, { align: 2 });
-    g.label('Tap to skip', W / 2, 154, 7, C.dim, { align: 1 });
+    const s = this.m.sim!, n = Math.min(s.track.length, Math.floor(this.m.simT / 0.8) + 1);
+    const x = W / 2 - 91, y = TOP + 16, w = 182;
+    // Opposition possession is shown as a moving field marker, not a wall of commentary.
+    g.card(x, y, w, this.showTutorial ? 46 : 39, C.dark, 0.84);
+    g.label('THEIR ATTACK', W / 2, y + 4, 10, C.gold, { align: 1, bold: true });
+    g.rect(x + 8, y + 20, w - 16, 10, PITCH.a);
+    g.rect(x + 8, y + 20, 1, 10, C.ink); g.rect(x + w - 9, y + 20, 1, 10, C.ink);
+    g.rect(x + w / 2, y + 20, 1, 10, C.ink, 0.55);
+    const pos = clamp(s.track[Math.max(0, n - 1)] ?? 50, 0, 100);
+    g.rect(x + 8 + (w - 16) * pos / 100 - 2, y + 18, 5, 14, C.gold);
+    if (this.showTutorial) g.label('Tap to skip', W / 2, y + 34, 7, C.dim, { align: 1 });
   }
 
   private drawFullTime(g: Gfx) {
@@ -887,13 +895,12 @@ export class MatchScene implements Scene {
 
     if (k.phase === 'fly' || (k.phase === 'over' && k.result !== 'charged')) {
       const p = m.flightAt(k, k.phase === 'fly' ? Math.min(1, k.t / k.dur) : 1), bx = this.X(p.x), by = this.Y(p.y);
-      g.rect(bx - 3 * sc, by, 6 * sc, 2, '#000', 0.3);
-      drawMatchBall(g, bx, by - 6 * sc - Math.round(p.z * ZP), sc);
+      drawAirborneBall(g, bx, by, p.z, sc);
     } else drawMatchBall(g, fx + 3 * sc, fy - 1, sc);
 
     this.drawWind(g, this.left + 6, TOP + 16);
     const dist = Math.round(Math.hypot(FL - k.from.x, MID - k.from.y));
-    g.label(`${conv ? 'Conversion' : 'Penalty kick'}, ${dist} m out`, this.left + 6, TOP + 4, 8, C.gold, { bold: true });
+    g.label(`${conv ? 'CONVERSION' : 'GOAL KICK'}   ${dist}m`, this.left + 6, TOP + 4, 7.5, C.gold, { bold: true });
     if (k.phase !== 'wait' && k.phase !== 'aim') return;
     const t = this.touch('ball'), a0 = t ? this.aimOf(t) : null, a = a0 ? m.aimGoal(a0.ax, a0.ay, a0.power) : null;
     if (t) { g.frame(t.x0 - 4, t.y0 - 4, 9, 9, C.ink); g.rect(t.x - 2, t.y - 2, 5, 5, C.gold, 0.8); }
@@ -904,8 +911,9 @@ export class MatchScene implements Scene {
       g.frame(ex - 5, ey - 3, 11, 7, reach ? C.gold : C.ink);
       if (!reach) g.label('Not far enough: pull back further', W / 2, H - 33, 8, C.red, { align: 1, bold: true });
     }
-    g.rect(this.left, H - 19, this.vw, 19, C.dark, 0.62);
-    g.label(conv ? 'Pull back to aim, let go to kick. Their man charges as soon as you touch' : 'Pull back to aim, let go to kick', W / 2, H - 17, 7, C.ink, { align: 1 });
-    g.label('The dotted line is still air. Allow for the wind', W / 2, H - 9, 6.5, C.dim, { align: 1 });
+    if (this.showTutorial) {
+      g.rect(this.left, H - 14, this.vw, 14, C.dark, 0.7);
+      g.label('Pull back to aim. Release to kick. Watch the wind.', W / 2, H - 12, 7, C.ink, { align: 1 });
+    }
   }
 }
