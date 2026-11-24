@@ -44,3 +44,14 @@ The reviewed source is stored in the user's personal repository `TheRock1801/Gam
 - Added regression tests in `tests/ux.test.ts`; locally ran eight standalone Node runtime smoke checks and a source-level TypeScript check.
 
 **Validation limit:** The full npm install and Vitest suite could not run inside this restricted execution environment. On Windows, run `npm ci`, `npm test`, and `npm run build` before wider sharing. Phone touch and conversion visuals still deserve manual QA.
+## World Cup squad and Character Studio update, 24 November 2026
+
+- The 24 international teams each start with twelve named real-player placeholders; sources mix 2023-2026 seasons and are **not confirmed 2027 World Cup squads**.
+- The name array follows the game's twelve game-sheet slots. Generated ages, appearances, ability ratings and team strength are fictional.
+- World Cup mode has fixed players. Buying, replacing, rerolling the market, training attribute purchases and club facility upgrades are blocked; the market tab and credit prompts are hidden.
+- Club career mode retains its existing transfer market, development and upgrade systems.
+- The desktop developer site at `http://localhost:5173/dev.html` now has a Character studio below the existing test match. Select any team and each of its twelve characters, then edit name, age, skin-tone palette, featured flag and Stamina/Handling/Passing/Kicking/Tackling.
+- Edits autosave as browser drafts; **Play this country** reloads an international test match using the draft; **Publish character changes** updates the local source file `src/data/roster-overrides.json`. Commit and push that JSON to share your edits with other devices or future builds.
+- Existing saved careers retain their previous player data. Start a **new World Cup** to see the new names and published character changes.
+- International names and team references need review for current eligibility, likeness, trademark, and other applicable commercial permissions before an app-store launch.
+- Source TypeScript checked and offline Node runtime tests passed for 24 / 288 names, the World Cup transfer lock, continued club market and developer roster edits. Run the full Vitest suite, Vite production build and desktop/phone visual QA before release.
