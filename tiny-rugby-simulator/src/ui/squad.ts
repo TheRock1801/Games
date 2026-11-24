@@ -52,7 +52,7 @@ export class PlayerScene implements Scene {
     const game = this.game;
     if (chrome(game, g, 1)) return;
     const c = game.career!, t = c.teams[this.teamId], p = t.roster[this.slot];
-    const editable = this.teamId === c.teamId;
+    const editable = this.teamId === c.teamId && t.kind === 'club' && c.mode !== 'cup' && c.stage !== 'worldcup';
     drawFace(g, 8, CONTENT_Y, 40, p, t);
     g.label(p.name, 56, CONTENT_Y - 1, 13, C.ink, { display: true });
     g.label(`${POS[p.pos] ?? p.pos}   Age ${p.age}${t.kind === 'club' ? `   $${p.salary}k a year, ${p.years} to run` : ''}`, 56, CONTENT_Y + 16, 7.5, C.dim);
