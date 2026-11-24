@@ -3,6 +3,7 @@ import { TEAMS, CLUB_IDS, URC_IDS, NATION_IDS, WC_POOLS, COMP_NAMES } from '../d
 import { SLOTS, type Attr, type Career, type Comp, type Fixture, type MatchResult, type Player, type Team } from './types';
 import { ATTRIBUTES, genPlayer, ovr, salaryFor } from './players';
 import { advance, newComp, record, simFixture, standings } from './competition';
+import { populateRoster } from '../data/roster-editor';
 
 // The salary cap, in thousands: $1M. Fictional money, like everything else in the market.
 export const CAP = 1000, START_YEAR = 2026, SAVE_KEY = 'trytime.save.v1';
@@ -43,6 +44,9 @@ export function newCareer(seed: number, teamId: string, mode: 'career' | 'cup' =
       hero.star = true; hero.age = rng.int(22, 25); hero.pot = clamp(ovr(hero) + rng.int(4, 9), 0, 99); hero.years = 3;
       roster[at] = hero;
     }
+    // Apply the real-player name defaults and any developer-edited character traits.
+    // Club stars are chosen first so their slot can be customised too.
+    populateRoster(d.id, roster);
     // squad players come cheap; it is the featured men who cost
     if (d.kind === 'club') for (const p of roster) p.salary = Math.round(salaryFor(ovr(p)) * (mine && !p.star ? 0.66 : 0.9));
     teams[d.id] = { id: d.id, name: d.name, kind: d.kind, base: d.base, c1: d.c1, c2: d.c2, names: d.names, six: d.league === 'urc', roster };
@@ -319,7 +323,8 @@ export function slotFor(c: Career, p: Player): number {
 
 export function canSign(c: Career, slot: number, p: Player): boolean {
   const t = c.teams[c.teamId];
-  return t.kind === 'nation' || capUsed(t) - t.roster[slot].salary + p.salary <= CAP;
+  return c.mode !== 'cup' && c.stage !== 'worldcup' && t.kind === 'club' &&
+    !!t.roster[slot] && capUsed(t) - t.roster[slot].salary + p.salary <= CAP;
 }
 
 export function sign(c: Career, slot: number, p: Player): boolean {
@@ -336,6 +341,7 @@ export function sign(c: Career, slot: number, p: Player): boolean {
 }
 
 export function train(c: Career, slot: number, a: Attr): boolean {
+  if (c.mode === 'cup' || c.stage === 'worldcup') return false;
   const p = c.teams[c.teamId].roster[slot];
   if (p[a] >= 99 || ovr(p) >= developmentCeiling(c, p)) return false;
   const point = (p.points ?? 0) > 0;
@@ -347,6 +353,7 @@ export function train(c: Career, slot: number, a: Attr): boolean {
 }
 
 export function upgrade(c: Career, f: 'train' | 'med'): boolean {
+  if (c.mode === 'cup' || c.stage === 'worldcup') return false;
   const lvl = c.fac[f];
   if (lvl >= FAC_COST[f].length || c.credits < FAC_COST[f][lvl]) return false;
   c.credits -= FAC_COST[f][lvl]; c.fac[f]++;

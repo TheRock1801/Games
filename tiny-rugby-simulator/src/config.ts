@@ -3,6 +3,7 @@
 // the portal last saved. To add a dial: add a line here, then read `T.<key>` where the game needs it.
 
 import tuned from './tuned.json';
+import { setDevelopmentRosters, type RosterOverrides } from './data/roster-editor';
 
 export interface TuneDef { key: string; group: string; label: string; help: string; min: number; max: number; step: number; def: number; unit?: string }
 
@@ -68,20 +69,21 @@ export const PLAY: { attack: Formation | null; defence: Formation | null } = { a
 
 // What the portal saves in the browser. The game itself only ever reads it in a development build.
 export const DEV_KEY = 'trytime.dev.v1';
-export interface DevStore { tuning: Tuning; history: { at: string; note: string; tuning: Tuning }[]; formations: Formation[]; use: { attack: string | null; defence: string | null } }
+export interface DevStore { tuning: Tuning; history: { at: string; note: string; tuning: Tuning }[]; formations: Formation[]; use: { attack: string | null; defence: string | null }; rosters: RosterOverrides }
 
 export function loadDev(get: (k: string) => string | null): DevStore {
-  const blank: DevStore = { tuning: { ...DEFAULT_TUNING }, history: [], formations: [], use: { attack: null, defence: null } };
+  const blank: DevStore = { tuning: { ...DEFAULT_TUNING }, history: [], formations: [], use: { attack: null, defence: null }, rosters: {} };
   try {
     const raw = get(DEV_KEY);
     if (!raw) return blank;
     const d = JSON.parse(raw) as Partial<DevStore>;
-    return { tuning: { ...DEFAULT_TUNING, ...(d.tuning ?? {}) }, history: d.history ?? [], formations: d.formations ?? [], use: d.use ?? blank.use };
+    return { tuning: { ...DEFAULT_TUNING, ...(d.tuning ?? {}) }, history: d.history ?? [], formations: d.formations ?? [], use: d.use ?? blank.use, rosters: d.rosters ?? {} };
   } catch { return blank; }
 }
 
 // Puts a saved portal state into effect for the next match.
 export function useDev(d: DevStore) {
+  setDevelopmentRosters(d.rosters ?? {});
   applyTuning(d.tuning);
   PLAY.attack = d.formations.find(f => f.side === 'attack' && f.name === d.use.attack) ?? null;
   PLAY.defence = d.formations.find(f => f.side === 'defence' && f.name === d.use.defence) ?? null;

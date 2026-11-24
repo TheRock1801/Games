@@ -60,6 +60,7 @@ export function route(game: Game): Scene {
 // After a round: the credits it paid, shown once, and then on to wherever the career goes next.
 function afterRound(game: Game): Scene {
   const c = game.career!, next = () => (c.stage === 'season' || c.stage === 'worldcup' ? new MatchCentreScene(game) : route(game));
+  if (c.mode === 'cup' || c.stage === 'worldcup') { c.lastEarn = null; return next(); }
   return c.lastEarn ? new EarnScene(game, next) : next();
 }
 
@@ -89,13 +90,15 @@ export function chrome(game: Game, g: Gfx, active: number): boolean {
   g.rect(g.left, 0, g.vw, 19, C.dark);
   kitBadge(g, 6, 3, team, 9, 13);
   g.label(tc(team.name), 20, 3.5, 11, C.ink, { display: true });
-  g.label(`Credits: ${c.credits}`, W - 8, 5, 8.5, C.gold, { align: 2, bold: true });
-  const tw = W / TABS.length;
+  const inWorldCup = c.mode === 'cup' || c.stage === 'worldcup';
+  g.label(inWorldCup ? 'WORLD CUP' : `Credits: ${c.credits}`, W - 8, 5, 8.5, C.gold, { align: 2, bold: true });
+  const visibleTabs = inWorldCup ? TABS.slice(0, 4) : TABS;
+  const tw = W / visibleTabs.length;
   g.rect(g.left, 19, g.vw, 15, C.panel);
-  for (let i = 0; i < TABS.length; i++) {
+  for (let i = 0; i < visibleTabs.length; i++) {
     const r: Rect = [i * tw, 19, tw, 15], on = i === active;
     if (on) { g.rect(r[0] + 2, 19, tw - 4, 15, C.bg); g.rect(r[0] + 2, 19, tw - 4, 2, C.gold); }
-    g.label(TABS[i], r[0] + tw / 2, 22.8, 6.3, on ? C.gold : C.dim, { align: 1, bold: on });
+    g.label(visibleTabs[i], r[0] + tw / 2, 22.8, 6.3, on ? C.gold : C.dim, { align: 1, bold: on });
     if (!on && game.tap && inRect(game.tap, r)) { game.tap = null; game.go(tabScene(game, i)); return true; }
   }
   return false;
@@ -258,7 +261,7 @@ export class MyCareerScene implements Scene {
     if (button(game, g, bx, CONTENT_Y + 48, bw, 20, this.history ? 'Back to summary' : 'Career history', { col: C.panel2, size: 8 })) this.history = !this.history;
     if (button(game, g, bx, CONTENT_Y + 72, bw, 20, isMuted() ? 'Sound: off' : 'Sound: on', { col: C.panel2, size: 8 })) setMuted(!isMuted());
     if (button(game, g, bx, CONTENT_Y + 98, bw, 20, 'Save and quit', { size: 8 })) { saveGame(game); game.go(new TitleScene(game)); }
-    g.label(`Reputation ${Math.round(c.rep)}   Every match earns credits; a win earns more`, 8, 164, 6.5, C.dim);
+    g.label(c.mode === 'cup' || c.stage === 'worldcup' ? 'International squads are fixed for this tournament' : `Reputation ${Math.round(c.rep)}   Every match earns credits; a win earns more`, 8, 164, 6.5, C.dim);
   }
 }
 
