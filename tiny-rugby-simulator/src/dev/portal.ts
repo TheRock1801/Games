@@ -3,10 +3,13 @@
 // game in the frame picks it up at once (see the DEV block in main.ts), so what you see is the real thing.
 import { DEFAULT_TUNING, DEV_KEY, FACTORY_TUNING, TUNE_DEFS, loadDev, type DevStore, type Tuning } from '../config';
 import { SCENARIOS } from '../scenarios';
+import { buildCharacters } from './characters';
+import { setDevelopmentRosters } from '../data/roster-editor';
 
 const $ = <T extends HTMLElement>(html: string): T => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild as T; };
 let store: DevStore = loadDev(k => localStorage.getItem(k));
-const write = () => localStorage.setItem(DEV_KEY, JSON.stringify(store));
+const write = () => { localStorage.setItem(DEV_KEY, JSON.stringify(store)); setDevelopmentRosters(store.rosters); };
+setDevelopmentRosters(store.rosters);
 const fmt = (v: number, step: number) => String(Number(v.toFixed(step < 0.1 ? 2 : step < 1 ? 1 : 0)));
 
 const tuning = document.getElementById('tuning')!, stage = document.getElementById('stage')!;
@@ -134,7 +137,8 @@ function buildHistory() {
 }
 
 // the Training Ground and the defence editor inside the frame write to the same storage: stay in step
-window.addEventListener('storage', e => { if (e.key === DEV_KEY) { store = loadDev(k => localStorage.getItem(k)); buildStage(); } });
+window.addEventListener('storage', e => { if (e.key === DEV_KEY) { store = loadDev(k => localStorage.getItem(k)); setDevelopmentRosters(store.rosters); buildStage(); buildCharacters(() => store, write, show); } });
 
 buildTuning();
 buildStage();
+buildCharacters(() => store, write, show);
