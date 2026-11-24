@@ -11,6 +11,23 @@ const POS: Record<string, string> = {
 };
 const col = (v: number) => (v >= 85 ? C.gold : v >= 70 ? C.ink : v >= 60 ? C.dim : C.red);
 
+// Long international names keep their surname visible on the small mobile squad cards.
+function fitPlayerName(g: Gfx, full: string, width: number, size: number, display = false): string {
+  const opt = { bold: true, display };
+  if (g.tw(full, size, opt) <= width) return full;
+  const words = full.trim().split(/\s+/);
+  const initial = (words[0]?.[0] ?? '').toUpperCase();
+  for (let keep = Math.min(3, words.length - 1); keep >= 1; keep--) {
+    const next = initial + '. ' + words.slice(-keep).join(' ');
+    if (g.tw(next, size, opt) <= width) return next;
+  }
+  const last = words[words.length - 1] ?? full;
+  let s = initial + '. ' + last;
+  while (s.length > 4 && g.tw(s + '…', size, opt) > width) s = s.slice(0, -1);
+  return s === initial + '. ' + last ? s : s + '…';
+}
+
+
 function fitness(g: Gfx, x: number, y: number, w: number, p: Player) {
   if (p.inj > 0) { g.label(`Injured, ${p.inj} wk`, x, y - 2.5, 6.5, C.red, { bold: true }); return; }
   g.card(x, y, w, 4, C.dark);
@@ -32,7 +49,7 @@ export class SquadScene implements Scene {
       drawFace(g, r[0] + 2, r[1] + 2, 17, p, t);
       // a featured player wears a gold flash; the rest are the squad you started with
       if (p.star) g.rect(r[0], r[1] + 1, 2, r[3] - 2, C.gold);
-      g.label(p.name, r[0] + 24, r[1] + 1.5, 8, p.star ? C.ink : C.dim, { bold: true });
+      g.label(fitPlayerName(g, p.name, 108, 8), r[0] + 24, r[1] + 1.5, 8, p.star ? C.ink : C.dim, { bold: true });
       g.label(POS[p.pos] ?? p.pos, r[0] + 24, r[1] + 11.5, 6, C.dim);
       fitness(g, r[0] + 70, r[1] + 14, 38, p);
       g.label(String(ovr(p)), r[0] + 146, r[1] + 3, 13, col(ovr(p)), { align: 2, display: true });
@@ -54,7 +71,7 @@ export class PlayerScene implements Scene {
     const c = game.career!, t = c.teams[this.teamId], p = t.roster[this.slot];
     const editable = this.teamId === c.teamId && t.kind === 'club' && c.mode !== 'cup' && c.stage !== 'worldcup';
     drawFace(g, 8, CONTENT_Y, 40, p, t);
-    g.label(p.name, 56, CONTENT_Y - 1, 13, C.ink, { display: true });
+    g.label(fitPlayerName(g, p.name, 200, 13, true), 56, CONTENT_Y - 1, 13, C.ink, { display: true });
     g.label(`${POS[p.pos] ?? p.pos}   Age ${p.age}${t.kind === 'club' ? `   $${p.salary}k a year, ${p.years} to run` : ''}`, 56, CONTENT_Y + 16, 7.5, C.dim);
     g.label('Fitness', 56, CONTENT_Y + 28, 6.5, C.dim); fitness(g, 84, CONTENT_Y + 31, 60, p);
     g.card(262, CONTENT_Y, 50, 38, C.panel);
