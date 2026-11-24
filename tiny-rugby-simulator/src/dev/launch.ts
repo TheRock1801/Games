@@ -6,6 +6,7 @@
 import type { Game } from '../engine/game';
 import { DEV_KEY, loadDev, useDev, type Formation } from '../config';
 import { newCareer } from '../career/career';
+import { NATION_IDS } from '../data/teams';
 import { sideFromTeam } from '../match/side';
 import { SCENARIOS } from '../scenarios';
 import { MatchScene } from '../ui/matchscene';
@@ -26,7 +27,14 @@ export function launch(game: Game, q: URLSearchParams) {
   const sc = SCENARIOS.find(s => s.id === q.get('scenario'));
   if (sc) { game.go(new MatchScene(game, us, them, false, seed, home, { title: sc.name, start: m => sc.start(m), onExit: home })); return; }
   const screen = q.get('screen');
-  if (screen === 'match') game.go(new MatchScene(game, us, them, false, seed, home));
+  if (screen === 'international') {
+    const id = q.get('team') ?? 'NZL';
+    const country = NATION_IDS.includes(id) ? id : 'NZL';
+    const wc = newCareer(2026, country, 'cup');
+    const rival = country === 'RSA' ? 'NZL' : 'RSA';
+    game.go(new MatchScene(game, sideFromTeam(wc.teams[country]), sideFromTeam(wc.teams[rival]), false, seed, home));
+  }
+  else if (screen === 'match') game.go(new MatchScene(game, us, them, false, seed, home));
   else if (screen === 'plays') game.go(new TrainingScene(game, () => new TitleScene(game)));
   else if (screen === 'defence') {
     const d = loadDev(k => game.store.get(k));
